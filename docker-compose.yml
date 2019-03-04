@@ -1,0 +1,22 @@
+version: "2"
+
+services:
+  mysql:
+    restart: always
+    image: mysql:5.5
+    volumes:
+      - ${SERVICE_DATA_DIR}/:/var/lib/mysql:Z
+      - ./server/db/conf:/etc/mysql/conf.d:Z
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+
+  2bizbox:
+    restart: always
+    image: jboss/base-jdk:8
+    depends_on:
+      - mysql
+    ports:
+      - "${SERVICE_ADDRESS}:2025:2025"
+    volumes:
+      - ./server/jboss:/opt/jboss:Z
+    command: bash /opt/jboss/bin/run.sh
