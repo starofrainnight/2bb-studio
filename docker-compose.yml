@@ -3,6 +3,7 @@ version: "2"
 services:
   mysql:
     restart: always
+    # 2BizBox 4.6 works perfect with MySQL 5.5 but have issues with 5.6!
     image: mysql:5.5
     volumes:
       - ${SERVICE_DATA_DIR}/:/var/lib/mysql:Z

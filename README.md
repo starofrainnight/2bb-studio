@@ -11,7 +11,7 @@ distributions).
 ## Installation
 
 1. You must got an legal windows version 2BizBox binary that contained server
-   installer.
+   installer (Only tested on 2BizBox 4.6)
 2. Install 2BizBox server on windows or wine on linux
 3. Clone this project to `/opt/2bb-studio` or any directory you want
 4. Copy `server` directory under 2BizBox installation directory to
