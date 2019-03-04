@@ -1,3 +1,50 @@
 # 2bb-studio
 
-A runtime environment for 2BizBox server base on docker containers
+A runtime environment for 2BizBox server base on docker containers.
+
+## Purpose
+
+Base on this project, you could run 2BizBox server easily on any linux
+environment (2BizBox only provied binary that only support CentOS
+distributions).
+
+## Installation
+
+1. You must got an legal windows version 2BizBox binary that contained server
+   installer.
+2. Install 2BizBox server on windows or wine on linux
+3. Clone this project to `/opt/2bb-studio` or any directory you want
+4. Copy `server` directory under 2BizBox installation directory to
+   `/opt/2bb-studio` directory
+5. Create an `.env` file inside `/opt/2bb-studio` with this setting :
+
+   ```bash
+   SERVICE_DATA_DIR=/srv/2bizbox
+   SERVICE_ADDRESS=0.0.0.0
+   ```
+
+6. Ensure you have python3.6 or above installed
+7. Install python requirements by command `pip3 install -r requirements.txt`
+   under `/opt/2bb-studio`
+8. Done!
+
+## Usage
+
+### Start Server
+
+```bash
+python3 -m manager start
+```
+
+### Stop Server
+
+```bash
+python3 -m manager stop
+```
+
+## License
+
+All sources contained in this project are licensed under Apache License,
+Version 2.0 (the "License");
+
+You may obtain a copy of the License at <http://www.apache.org/licenses/LICENSE-2.0>
