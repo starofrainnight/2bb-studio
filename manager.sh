@@ -21,4 +21,4 @@ get_script_dir() {
 SCRIPT_DIR="$(get_script_dir)"
 
 cd ${SCRIPT_DIR}
-python3 -m manager %*
+python3 -m manager $@
