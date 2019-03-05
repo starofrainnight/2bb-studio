@@ -28,13 +28,44 @@ distributions).
    under `/opt/2bb-studio`
 8. Done!
 
+The final directory tree of `/opt/2bb-studio` will looks like:
+
+```bash
+/opt
+|
++----2bb-studio
+     |
+     +---- manager # 2bb-studio Manager Program
+     |     |
+     |     +---- ...
+     |
+     +---- server # 2BizBox Installed Server Binaries
+     |     |
+     |     +---- conf # Generated during start command
+     |     |     |
+     |     |     +---- my.cnf
+     |     |
+     |     +---- ...
+     |
+     +---- docker-compose.yml
+     +---- ...
+```
+
 ## Usage
 
 ### Start Server
 
+Start the 2BizBox server.
+
 ```bash
 python3 -m manager start
 ```
+
+This command will do these jobs before start the server:
+
+1. Copy `my.ini` under `server/db/my.ini` to `server/conf/my.cnf`
+2. Fix options in `my.cnf` that not working with MySQL 5.5 docker image
+3. Initialize database if there does not have initialized database
 
 ### Stop Server
 
