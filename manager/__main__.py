@@ -12,6 +12,8 @@ from subprocess import run, PIPE, DEVNULL
 from rabird.core.configparser import ConfigParser
 from configparser import NoSectionError, NoOptionError
 from attrdict import AttrDict
+from typing import Dict
+from glob import glob
 
 
 class TimeoutError(Exception):
@@ -31,6 +33,14 @@ class Application(object):
     def mysql_containter_name(self) -> str:
         return self._mysql_container_name
 
+    def load_envs(self) -> Dict[str, str]:
+        content = open("%s/.env" % self.base_dir).read()
+        envs = dict()
+        for line in content.splitlines():
+            splitted = line.strip().split("=")
+            envs[splitted[0].strip()] = splitted[1].strip()
+        return envs
+
     def wait_mysql_started(self, timeout: float = 60):
         while timeout > 0:
             p = run(
@@ -47,6 +57,45 @@ class Application(object):
             timeout -= 1
 
         raise TimeoutError("Is image not started?")
+
+    def start_docker_compose(self):
+        run(["docker-compose", "down"], cwd=self.base_dir)
+        run(["docker-compose", "up", "-d"], cwd=self.base_dir)
+
+    def stop_docker_compose(self):
+        run(["docker-compose", "down"], cwd=self.base_dir)
+
+    def init_db(self):
+        """Initialize database by default structure"""
+
+        click.echo("Shutdown all 2BizBox containers ...")
+
+        self.start_docker_compose()
+
+        click.echo("Waitting MySQL started ...")
+        self.wait_mysql_started()
+        click.echo("MySQL started.")
+
+        click.echo("Wait root user's password ready...")
+
+        time.sleep(10)
+
+        click.echo("Importing all database ...")
+
+        run(
+            'docker exec -i %s bash -c "mysql -u root --password=root"'
+            % self.mysql_containter_name,
+            input=open(
+                str(self.base_dir / "server" / "db" / "database.sql"), "rb"
+            ).read(),
+            shell=True,
+        )
+
+        click.echo("Database import done! Wait for 5 seconds to stop ...")
+
+        time.sleep(5)
+
+        self.stop_docker_compose()
 
 
 @click.group()
@@ -137,11 +186,18 @@ def start(app: Application):
 
         cfg.write(open(my_cnf_path, "w"), space_around_delimiters=False)
 
+    envs = app.load_envs()
+    data_dir = envs["SERVICE_DATA_DIR"]
+    if not glob(os.path.join(data_dir, "ibdata*")):
+        # If there don't have `ibdata*` files in data directory, that means
+        # the database not been initialize correctly.
+
+        app.init_db()
+
     # Really start the server
     click.echo("Starting 2BizBox server ...")
 
-    run(["docker-compose", "down"], cwd=app.base_dir)
-    run(["docker-compose", "up", "-d"], cwd=app.base_dir)
+    app.start_docker_compose()
 
 
 @main.command()
@@ -149,42 +205,7 @@ def start(app: Application):
 def stop(app: Application):
     """Stop server"""
 
-    run(["docker-compose", "down"], cwd=app.base_dir)
-
-
-@main.command()
-@click.pass_context
-@click.pass_obj
-def db_init(ctx: Context, app: Application):
-    """Initialize database by default structure"""
-
-    click.echo("Shutdown all 2BizBox containers ...")
-
-    ctx.invoke(start)
-
-    click.echo("Waitting MySQL started ...")
-    app.wait_mysql_started()
-    click.echo("MySQL started.")
-
-    click.echo("Wait root user's password ready...")
-
-    time.sleep(10)
-
-    click.echo("Importing all database ...")
-    run(
-        'docker exec -i %s bash -c "mysql -u root --password=root"'
-        % app.mysql_containter_name,
-        input=open(
-            str(app.base_dir / "server" / "db" / "database.sql"), "rb"
-        ).read(),
-        shell=True,
-    )
-
-    click.echo("Database import done! Wait for 5 seconds to stop ...")
-
-    time.sleep(5)
-
-    ctx.invoke(stop)
+    app.stop_docker_compose()
 
 
 if __name__ == "__main__":
