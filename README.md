@@ -19,7 +19,7 @@ distributions).
 5. Create an `.env` file inside `/opt/2bb-studio` with this setting :
 
    ```bash
-   SERVICE_DATA_DIR=/srv/2bizbox
+   SERVICE_DATA_DIR=/srv/2bb-studio
    SERVICE_ADDRESS=0.0.0.0
    ```
 
