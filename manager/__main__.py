@@ -83,7 +83,7 @@ class Application(object):
     def stop_docker_compose(self):
         run(["docker-compose", "down"], cwd=self.base_dir)
 
-    def init_db(self):
+    def db_init(self):
         """Initialize database by default structure"""
 
         click.echo("Shutdown all 2BizBox containers ...")
@@ -245,7 +245,7 @@ def start(app: Application):
         # If there don't have `ibdata*` files in data directory, that means
         # the database not been initialize correctly.
 
-        app.init_db()
+        app.db_init()
 
     # Really start the server
     click.echo("Starting 2BizBox server ...")
