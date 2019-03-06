@@ -2,3 +2,4 @@ click
 rabird.core
 attrdict
 arrow
+docker-compose
