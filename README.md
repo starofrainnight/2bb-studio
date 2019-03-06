@@ -5,8 +5,7 @@ A runtime environment for 2BizBox server base on docker containers.
 ## Purpose
 
 Base on this project, you could run 2BizBox server easily on any linux
-environment (2BizBox only provied binary that only support CentOS
-distributions).
+environment (2BizBox only provied binary that support CentOS distributions).
 
 ## Installation
 
