@@ -15,9 +15,13 @@ from subprocess import run, PIPE, DEVNULL
 from rabird.core.configparser import ConfigParser
 from configparser import NoSectionError, NoOptionError
 from attrdict import AttrDict
-from typing import Dict
+from typing import Dict, List
 from glob import glob
 from zipfile import ZipFile
+
+
+def is_path_type(value):
+    return isinstance(value, str) or isinstance(value, Path)
 
 
 class TimeoutError(Exception):
@@ -36,6 +40,16 @@ class Application(object):
     @property
     def mysql_containter_name(self) -> str:
         return self._mysql_container_name
+
+    @property
+    def databases(self) -> List[str]:
+        return [
+            "bb2_test",
+            "bb2_test_sg",
+            "bb2_default",
+            "bb2_default_sg",
+            "bb2_def",
+        ]
 
     def load_envs(self) -> Dict[str, str]:
         content = open("%s/.env" % self.base_dir).read()
@@ -86,20 +100,55 @@ class Application(object):
 
         click.echo("Importing all database ...")
 
-        run(
-            'docker exec -i %s bash -c "mysql -u root --password=root"'
-            % self.mysql_containter_name,
-            input=open(
-                str(self.base_dir / "server" / "db" / "database.sql"), "rb"
-            ).read(),
-            shell=True,
-        )
+        self.db_import(str(self.base_dir / "server" / "db" / "database.sql"))
 
         click.echo("Database import done! Wait for 5 seconds to stop ...")
 
         time.sleep(5)
 
         self.stop_docker_compose()
+
+    def db_dump(self, stdout, databases=[], force=False):
+        cname = self.mysql_containter_name
+
+        mysqldump_cmd = [
+            "mysqldump",
+            "-uroot",
+            "-proot",
+            "--opt",
+            "--databases" if databases else "--all-databases",
+            "--skip-lock-tables",
+            "--hex-blob",
+            "-f" if force else "",
+            " ".join(databases),
+        ]
+
+        docker_cmd = 'docker exec -i %s bash -c "%s"' % (
+            cname,
+            " ".join(mysqldump_cmd),
+        )
+
+        return run(docker_cmd, stdout=stdout, shell=True)
+
+    def db_import(self, sql_file, database=""):
+
+        try:
+            if is_path_type(sql_file):
+                sql_file = open(str(sql_file), "rb")
+
+            cname = self.mysql_containter_name
+
+            mysql_cmd = ["mysql", "-uroot", "-proot", database]
+
+            return run(
+                'docker exec -i %s bash -c "%s"'
+                % (cname, " ".join(mysql_cmd)),
+                input=sql_file.read(),
+                shell=True,
+            )
+        finally:
+            if not is_path_type(sql_file):
+                sql_file.close()
 
 
 @click.group()
@@ -218,38 +267,13 @@ def stop(app: Application):
 def backup(app: Application, output_dir: str):
     """Backup the database"""
 
-    cname = app.mysql_containter_name
-
-    databases = [
-        "bb2_test",
-        "bb2_test_sg",
-        "bb2_default",
-        "bb2_default_sg",
-        "bb2_def",
-    ]
-
-    mysqldump_cmd = [
-        "mysqldump",
-        "-uroot",
-        "-proot",
-        "--opt",
-        "--databases",
-        " ".join(databases),
-        "--skip-lock-tables",
-        "--hex-blob",
-    ]
-    docker_cmd = 'docker exec -i %s bash -c "%s"' % (
-        cname,
-        " ".join(mysqldump_cmd),
-    )
-
     click.echo("Backup now and it will take several minutes, please wait...")
 
     os.chdir(output_dir)
 
     file_name = arrow.now().format("YYYYMMDDHHmmss") + ".sql"
     with open(file_name, "wb") as f:
-        p = run(docker_cmd, stdout=f, shell=True)
+        p = app.db_dump(app.databases, f)
     if 0 != p.returncode:
         os.remove(file_name)
         click.echo(
@@ -286,12 +310,75 @@ def recovery(app: Application, input_file: str):
         file_name = os.path.splitext(file_name)[0]
         file_path = os.path.join(temp_dir, file_name)
 
-        run(
-            'docker exec -i %s bash -c "mysql -u root --password=root"'
-            % app.mysql_containter_name,
-            input=open(file_path, "rb").read(),
-            shell=True,
+        app.db_import(file_path)
+    finally:
+        shutil.rmtree(temp_dir)
+
+
+@main.command()
+@click.pass_obj
+def default_to_test(app: Application):
+    """Transfer Data From Default To Test"""
+
+    import textwrap
+
+    click.echo(
+        textwrap.dedent(
+            """\
+            Export data from default and it will take several minutes, please
+            wait...
+            """
+        ).replace("\n", " ")
+    )
+
+    temp_dir = tempfile.mkdtemp()
+    try:
+        sql_file_path = os.path.join(temp_dir, "default.sql")
+        with open(sql_file_path, "w") as f:
+            p = app.db_dump(f, databases=["bb2_default"], force=True)
+        if p.returncode != 0:
+            click.echo("Failed to export data!", err=True)
+            return p.returncode
+        click.echo("Export data successfully!")
+
+        click.echo(
+            textwrap.dedent(
+                """\
+                Import data to test and it will take several minutes,
+                please wait...
+                """
+            ).replace("\n", " ")
         )
+
+        p = app.db_import(sql_file_path, "bb2_test")
+        if p.returncode != 0:
+            click.echo("Import data to test fail!", err=True)
+        click.echo("Import data to test successfully")
+
+        with open(sql_file_path, "w") as f:
+            p = app.db_dump(f, databases=["bb2_default_sg"], force=True)
+        if p.returncode != 0:
+            click.echo("Fail to export data!", err=True)
+
+        click.echo("Export data successfully")
+
+        click.echo(
+            textwrap.dedent(
+                """\
+                Import data to test_sg and it will take several minutes,
+                please wait...
+                """
+            ).replace("\n", " ")
+        )
+
+        p = app.db_import(sql_file_path, "bb2_test_sg")
+        if p.returncode != 0:
+            click.echo("Import data to test fail!", err=True)
+
+        click.echo("Import data to test successfully")
+
+        click.echo("Transfter data from default to test successfully!\n")
+
     finally:
         shutil.rmtree(temp_dir)
 
