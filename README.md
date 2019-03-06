@@ -26,7 +26,8 @@ distributions).
 6. Ensure you have python3.6 or above installed
 7. Install python requirements by command `pip3 install -r requirements.txt`
    under `/opt/2bb-studio`
-8. Done!
+8. Ensure you have docker installed
+9. Done!
 
 The final directory tree of `/opt/2bb-studio` will looks like:
 
