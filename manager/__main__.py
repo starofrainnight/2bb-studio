@@ -184,6 +184,24 @@ def start(app: Application):
         with open(ds_cfg_path, "w") as f:
             f.write(content.replace(orig_connection, "mysql:3306"))
 
+    # Fixs permissions of jboss directory
+    run(
+        [
+            "docker-compose",
+            "run",
+            "--user=root",
+            "-v",
+            "%s:/opt/jboss" % os.path.join(app.base_dir, "server/jboss"),
+            "--rm",
+            "--entrypoint",
+            "/bin/bash",
+            "2bizbox",
+            "-c",
+            "chown -Rf jboss:jboss /opt/jboss",
+        ]
+    )
+    app.stop_docker_compose()
+
     # Fixs my.cnf
     orig_my_cnf_path = os.path.join(app.base_dir, "server/db/my.ini")
 
