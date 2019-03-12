@@ -56,6 +56,10 @@ class Application(object):
         envs = dict()
         for line in content.splitlines():
             splitted = line.strip().split("=")
+            # Skip empty lines or there do not have '=' symbol
+            if len(splitted) < 2:
+                continue
+
             envs[splitted[0].strip()] = splitted[1].strip()
         return envs
 
