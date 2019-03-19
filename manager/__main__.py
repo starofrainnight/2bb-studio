@@ -193,6 +193,8 @@ def start(app: Application):
             "-v",
             "%s:/opt/jboss" % os.path.join(app.base_dir, "server/jboss"),
             "--rm",
+            # Don't run the linked mysql service!
+            "--no-deps",
             "--entrypoint",
             "/bin/bash",
             "2bizbox",
