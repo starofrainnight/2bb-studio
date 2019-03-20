@@ -297,7 +297,7 @@ def backup(app: Application, output_dir: str):
 
     file_name = arrow.now().format("YYYYMMDDHHmmss") + ".sql"
     with open(file_name, "wb") as f:
-        p = app.db_dump(app.databases, f)
+        p = app.db_dump(f, app.databases)
     if 0 != p.returncode:
         os.remove(file_name)
         click.echo(
