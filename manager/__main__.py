@@ -112,7 +112,9 @@ class Application(object):
 
         self.stop_docker_compose()
 
-    def db_dump(self, stdout, databases=[], force=False):
+    def db_dump(
+        self, stdout, databases=[], force=False, without_db_name=False
+    ):
         cname = self.mysql_containter_name
 
         mysqldump_cmd = [
@@ -120,9 +122,12 @@ class Application(object):
             "-uroot",
             "-proot",
             "--opt",
-            "--databases" if databases else "--all-databases",
+            ("" if without_db_name else "--databases")
+            if databases
+            else "--all-databases",
             "--skip-lock-tables",
             "--hex-blob",
+            "--routines" if without_db_name else "",
             "-f" if force else "",
             " ".join(databases),
         ]
@@ -131,7 +136,6 @@ class Application(object):
             cname,
             " ".join(mysqldump_cmd),
         )
-
         return run(docker_cmd, stdout=stdout, shell=True)
 
     def db_import(self, sql_file, database=""):
@@ -142,7 +146,13 @@ class Application(object):
 
             cname = self.mysql_containter_name
 
-            mysql_cmd = ["mysql", "-uroot", "-proot", database]
+            mysql_cmd = [
+                "mysql",
+                "-uroot",
+                "-proot",
+                ("-D%s" % database) if database else "",
+                database,
+            ]
 
             return run(
                 'docker exec -i %s bash -c "%s"'
@@ -150,6 +160,7 @@ class Application(object):
                 input=sql_file.read(),
                 shell=True,
             )
+
         finally:
             if not is_path_type(sql_file):
                 sql_file.close()
@@ -346,60 +357,71 @@ def default_to_test(app: Application):
 
     import textwrap
 
-    click.echo(
-        textwrap.dedent(
-            """\
-            Export data from default and it will take several minutes, please
-            wait...
-            """
-        ).replace("\n", " ")
-    )
-
     temp_dir = tempfile.mkdtemp()
     try:
-        sql_file_path = os.path.join(temp_dir, "default.sql")
-        with open(sql_file_path, "w") as f:
-            p = app.db_dump(f, databases=["bb2_default"], force=True)
-        if p.returncode != 0:
-            click.echo("Failed to export data!", err=True)
-            return p.returncode
-        click.echo("Export data successfully!")
+        # Convertion Contexts
+        cvt_ctxs = [
+            AttrDict(
+                {
+                    "file_name": "db.sql",
+                    "src_db": "bb2_default",
+                    "dst_db": "bb2_test",
+                }
+            ),
+            AttrDict(
+                {
+                    "file_name": "db_sg.sql",
+                    "src_db": "bb2_default_sg",
+                    "dst_db": "bb2_test_sg",
+                }
+            ),
+        ]
 
-        click.echo(
-            textwrap.dedent(
-                """\
-                Import data to test and it will take several minutes,
-                please wait...
-                """
-            ).replace("\n", " ")
-        )
+        for actx in cvt_ctxs:
+            click.echo(
+                " * [Transfer Data From %s To %s]" % (actx.src_db, actx.dst_db)
+            )
 
-        p = app.db_import(sql_file_path, "bb2_test")
-        if p.returncode != 0:
-            click.echo("Import data to test fail!", err=True)
-        click.echo("Import data to test successfully")
+            click.echo(
+                textwrap.dedent(
+                    """\
+                    Exporting data from %s and it will take several minutes,
+                    please wait...
+                    """
+                ).replace("\n", " ")
+                % actx.src_db
+            )
 
-        with open(sql_file_path, "w") as f:
-            p = app.db_dump(f, databases=["bb2_default_sg"], force=True)
-        if p.returncode != 0:
-            click.echo("Fail to export data!", err=True)
+            apath = os.path.join(temp_dir, actx.file_name)
+            with open(apath, "w") as f:
+                p = app.db_dump(
+                    f,
+                    databases=[actx.src_db],
+                    force=True,
+                    without_db_name=True,
+                )
+            if p.returncode != 0:
+                click.echo("Failed to export data!", err=True)
+                return p.returncode
 
-        click.echo("Export data successfully")
+            click.echo("Export database %s successfully!" % actx.src_db)
 
-        click.echo(
-            textwrap.dedent(
-                """\
-                Import data to test_sg and it will take several minutes,
-                please wait...
-                """
-            ).replace("\n", " ")
-        )
+            click.echo(
+                textwrap.dedent(
+                    """\
+                    Importing data to %s and it will take several minutes,
+                    please wait...
+                    """
+                ).replace("\n", " ")
+                % actx.dst_db
+            )
 
-        p = app.db_import(sql_file_path, "bb2_test_sg")
-        if p.returncode != 0:
-            click.echo("Import data to test fail!", err=True)
+            p = app.db_import(apath, actx.dst_db)
+            if p.returncode != 0:
+                click.echo("Import data to test fail!", err=True)
+                return p.returncode
 
-        click.echo("Import data to test successfully")
+            click.echo("Import data to %s successfully" % actx.dst_db)
 
         click.echo("Transfter data from default to test successfully!\n")
 
