@@ -15,7 +15,8 @@ environment (2BizBox only provied binary that support CentOS distributions).
 3. Clone this project to `/opt/2bb-studio` or any directory you want
 4. Copy `server` directory under 2BizBox installation directory to
    `/opt/2bb-studio` directory
-5. Create an `.env` file inside `/opt/2bb-studio` with this setting :
+5. Create an `.env` file inside `/opt/2bb-studio` with this setting (or what
+   settings you prefer):
 
    ```bash
    SERVICE_DATA_DIR=/srv/2bb-studio
